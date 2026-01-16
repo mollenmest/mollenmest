@@ -1,15 +1,60 @@
 <?php
-require_once 'functions.php';
-$mgr = new InstagramManager();
+// Try to extend execution time
+@set_time_limit(0);
+@ignore_user_abort(true);
 
-if (!$mgr->isLoggedIn()) {
+require_once 'functions.php';
+
+if (!isset($_SESSION['sessionid']) || !isset($_SESSION['user_id'])) {
     header('Location: index.php');
     exit;
 }
 
-$followers = $mgr->getFollowers();
-$following = $mgr->getFollowing();
-$nonFollowers = $mgr->getNonFollowers();
+$csrfToken = $_SESSION['csrf_token'] ?? null;
+$api = new InstagramAPI($_SESSION['sessionid'], $csrfToken);
+$api->setUserId($_SESSION['user_id']);
+
+if (!$api->init()) {
+    session_destroy();
+    header('Location: index.php?error=expired');
+    exit;
+}
+
+if ($api->getCsrfToken() && $api->getCsrfToken() !== 'missing') {
+    $_SESSION['csrf_token'] = $api->getCsrfToken();
+}
+
+// Handle Force Refresh
+$refresh = isset($_GET['refresh']);
+
+// Check Cache
+$cacheKey = 'data_' . $_SESSION['user_id'];
+$cachedData = $_SESSION[$cacheKey] ?? null;
+
+if ($cachedData && !$refresh && (time() - $cachedData['time'] < 900)) { // 15 mins cache
+    $followers = $cachedData['followers'];
+    $following = $cachedData['following'];
+} else {
+    $followers = $api->getFollowers(2000);
+    $following = $api->getFollowing(2000);
+
+    // Cache the result
+    $_SESSION[$cacheKey] = [
+        'time' => time(),
+        'followers' => $followers,
+        'following' => $following
+    ];
+}
+
+// Calculate Non-Followers
+$followerIds = array_column($followers, 'id');
+$nonFollowers = [];
+
+foreach ($following as $user) {
+    if (!in_array($user['id'], $followerIds)) {
+        $nonFollowers[] = $user;
+    }
+}
 
 $stats = [
     'followers' => count($followers),
@@ -64,7 +109,7 @@ $stats = [
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <span class="text-sm text-gray-400 hidden sm:block">Hoşgeldin, <span class="text-white font-semibold"><?php echo htmlspecialchars($_SESSION['username']); ?></span></span>
+                    <span class="text-sm text-gray-400 hidden sm:block">Kullanıcı ID: <span class="text-white font-semibold"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span></span>
                     <a href="logout.php" class="text-gray-400 hover:text-white transition-colors">
                         <i class="fas fa-sign-out-alt text-lg"></i>
                     </a>
@@ -83,7 +128,9 @@ $stats = [
                 <div class="flex justify-between items-start">
                     <div>
                         <p class="text-sm font-medium text-gray-400 uppercase tracking-wider">Takipçi</p>
-                        <h3 class="text-3xl font-bold text-white mt-1"><?php echo $stats['followers']; ?></h3>
+                        <h3 class="text-3xl font-bold text-white mt-1"><?php echo $stats['followers']; ?>
+                            <?php if ($stats['followers'] >= 2000) echo '<span class="text-xs text-gray-500">+</span>'; ?>
+                        </h3>
                     </div>
                     <div class="p-3 bg-blue-500/10 rounded-lg text-blue-400">
                         <i class="fas fa-users text-xl"></i>
@@ -97,7 +144,9 @@ $stats = [
                 <div class="flex justify-between items-start">
                     <div>
                         <p class="text-sm font-medium text-gray-400 uppercase tracking-wider">Takip Edilen</p>
-                        <h3 class="text-3xl font-bold text-white mt-1"><?php echo $stats['following']; ?></h3>
+                        <h3 class="text-3xl font-bold text-white mt-1"><?php echo $stats['following']; ?>
+                             <?php if ($stats['following'] >= 2000) echo '<span class="text-xs text-gray-500">+</span>'; ?>
+                        </h3>
                     </div>
                     <div class="p-3 bg-purple-500/10 rounded-lg text-purple-400">
                         <i class="fas fa-user-friends text-xl"></i>
@@ -120,6 +169,15 @@ $stats = [
             </div>
         </div>
 
+        <?php if ($stats['followers'] >= 2000 || $stats['following'] >= 2000): ?>
+        <div class="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 p-4 rounded-xl mb-8 text-sm flex items-center">
+            <i class="fas fa-exclamation-triangle mr-3 text-yellow-500"></i>
+            <div>
+                <strong>Dikkat:</strong> Hesabınızda çok sayıda kullanıcı olduğu için güvenlik limiti (2000) uygulandı. Listeler tam olmayabilir.
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Main Content -->
         <div class="glass-panel rounded-xl overflow-hidden min-h-[500px]">
             <div class="p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -129,8 +187,11 @@ $stats = [
                 </h3>
 
                 <div class="flex space-x-2">
-                     <!-- Bulk Action Placeholder -->
-                    <button onclick="alert('Toplu işlem özelliği yakında eklenecek!')" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-sm font-medium rounded-lg transition-colors border border-white/10">
+                    <a href="dashboard.php?refresh=1" class="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-sm font-medium rounded-lg transition-colors border border-blue-500/20">
+                        <i class="fas fa-sync-alt mr-2"></i> Yenile
+                    </a>
+
+                    <button onclick="alert('Toplu işlem API limitlerine takılabileceği için şu an devre dışı.')" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-sm font-medium rounded-lg transition-colors border border-white/10">
                         <i class="fas fa-layer-group mr-2"></i> Toplu Çıkar
                     </button>
                 </div>
@@ -143,7 +204,7 @@ $stats = [
                             <i class="fas fa-check text-2xl text-green-500"></i>
                         </div>
                         <h3 class="text-xl font-medium text-white">Harika!</h3>
-                        <p class="text-gray-400 mt-2">Seni takip etmeyen kimse kalmadı.</p>
+                        <p class="text-gray-400 mt-2">Analiz edilen kullanıcılar arasında seni takip etmeyen kimse yok.</p>
                     </div>
                 <?php else: ?>
                     <table class="w-full text-left border-collapse">
@@ -156,7 +217,7 @@ $stats = [
                         </thead>
                         <tbody class="divide-y divide-white/5" id="userList">
                             <?php foreach ($nonFollowers as $user): ?>
-                            <tr class="hover:bg-white/5 transition-colors group" id="row-<?php echo $user['username']; ?>">
+                            <tr class="hover:bg-white/5 transition-colors group" id="row-<?php echo $user['id']; ?>">
                                 <td class="p-4">
                                     <div class="flex items-center">
                                         <img class="h-10 w-10 rounded-full object-cover border border-white/10" src="<?php echo $user['profile_pic_url']; ?>" alt="">
@@ -172,7 +233,7 @@ $stats = [
                                     </span>
                                 </td>
                                 <td class="p-4 text-right">
-                                    <button onclick="unfollowUser('<?php echo $user['username']; ?>')" class="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center ml-auto min-w-[100px] shadow-lg shadow-red-500/20">
+                                    <button onclick="unfollowUser('<?php echo $user['id']; ?>')" class="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors duration-200 flex items-center justify-center ml-auto min-w-[100px] shadow-lg shadow-red-500/20">
                                         <i class="fas fa-user-minus mr-2"></i> Çıkar
                                     </button>
                                 </td>
@@ -186,8 +247,8 @@ $stats = [
     </div>
 
     <script>
-        function unfollowUser(username) {
-            const btn = $(`#row-${username} button`);
+        function unfollowUser(userId) {
+            const btn = $(`#row-${userId} button`);
             const originalText = btn.html();
 
             // Set Loading State
@@ -196,12 +257,12 @@ $stats = [
             $.ajax({
                 url: 'ajax.php',
                 type: 'POST',
-                data: { action: 'unfollow', username: username },
+                data: { action: 'unfollow', user_id: userId },
                 dataType: 'json',
                 success: function(response) {
                     if (response.status === 'success') {
                         // Success Animation
-                        $(`#row-${username}`).fadeOut(300, function() {
+                        $(`#row-${userId}`).fadeOut(300, function() {
                             $(this).remove();
                             updateStats();
                         });
@@ -211,7 +272,7 @@ $stats = [
                     }
                 },
                 error: function() {
-                    alert('Bir hata oluştu.');
+                    alert('Bir hata oluştu. Bağlantıyı kontrol edin.');
                     btn.prop('disabled', false).html(originalText);
                 }
             });

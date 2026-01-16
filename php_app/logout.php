@@ -1,7 +1,6 @@
 <?php
-require_once 'functions.php';
-$mgr = new InstagramManager();
-$mgr->logout();
+session_start();
+session_destroy();
 header('Location: index.php');
 exit;
 ?>

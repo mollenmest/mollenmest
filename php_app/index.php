@@ -1,22 +1,24 @@
 <?php
 require_once 'functions.php';
-$mgr = new InstagramManager();
-
-if ($mgr->isLoggedIn()) {
-    header('Location: dashboard.php');
-    exit;
-}
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
+    $sessionid = $_POST['sessionid'] ?? '';
 
-    if ($mgr->login($username, $password)) {
-        header('Location: dashboard.php');
-        exit;
+    if (!empty($sessionid)) {
+        // Try to initialize the session
+        $api = new InstagramAPI($sessionid);
+
+        if ($api->init()) {
+            $_SESSION['sessionid'] = $sessionid;
+            $_SESSION['user_id'] = $api->getUserId();
+            header('Location: dashboard.php');
+            exit;
+        } else {
+            $error = 'Giriş başarısız. Session ID geçersiz veya Instagram bağlantısı kurulamadı.';
+        }
     } else {
-        $error = 'Giriş başarısız. Lütfen tekrar deneyin.';
+        $error = 'Lütfen Session ID giriniz.';
     }
 }
 ?>
@@ -65,20 +67,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="POST" action="">
             <div class="mb-4">
-                <label class="block text-gray-300 text-xs font-bold mb-2 uppercase tracking-wide">Kullanıcı Adı</label>
+                <label class="block text-gray-300 text-xs font-bold mb-2 uppercase tracking-wide">
+                    Instagram Session ID
+                    <span class="group relative ml-1 cursor-help">
+                        <i class="far fa-question-circle text-gray-500"></i>
+                        <span class="pointer-events-none absolute -top-16 -right-10 w-48 rounded bg-gray-900 p-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 z-50 border border-gray-700">
+                            Güvenlik ve checkpoint sorunlarını aşmak için giriş yaparken 'sessionid' çerezini kullanıyoruz. Tarayıcı Geliştirici Araçları > Application > Cookies kısmından bulabilirsiniz.
+                        </span>
+                    </span>
+                </label>
                 <div class="relative">
-                    <span class="absolute left-3 top-3 text-gray-500"><i class="far fa-user"></i></span>
-                    <input type="text" name="username" class="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-transparent transition-all" placeholder="Instagram kullanıcı adı" required>
+                    <span class="absolute left-3 top-3 text-gray-500"><i class="fas fa-key"></i></span>
+                    <input type="text" name="sessionid" class="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-transparent transition-all" placeholder="Örn: 123456789:abcdef..." required>
                 </div>
-            </div>
-
-            <div class="mb-6">
-                <label class="block text-gray-300 text-xs font-bold mb-2 uppercase tracking-wide">Şifre</label>
-                <div class="relative">
-                    <span class="absolute left-3 top-3 text-gray-500"><i class="fas fa-lock"></i></span>
-                    <input type="password" name="password" class="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-transparent transition-all" placeholder="Instagram şifresi" required>
-                </div>
-                <p class="text-xs text-gray-500 mt-2 text-center">Not: Şifreniz kaydedilmez, sadece oturum açmak için kullanılır.</p>
+                <p class="text-xs text-gray-500 mt-2 text-center">Şifre gerektirmez. Hesabınız güvende.</p>
             </div>
 
             <button type="submit" class="w-full bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 focus:ring-offset-gray-900">
