@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, CheckCircle2, ShieldAlert, BadgeCheck } from 'lucide-react';
+import { User, CheckCircle2, ShieldAlert, BadgeCheck, Star } from 'lucide-react';
 import { UNFOLLOWERS_PER_PAGE } from '../lib/instagram';
 
-const Results = ({ users, selectedUsers, onToggleUser, currentTab, page, totalPages, onPageChange }) => {
+const Results = ({ users, selectedUsers, onToggleUser, onToggleWhitelist, currentTab, page, totalPages, onPageChange }) => {
   return (
     <div className="flex-1 p-8 overflow-hidden flex flex-col h-full">
       {/* Tab Header is handled in Dashboard, this is just the grid */}
@@ -30,6 +30,17 @@ const Results = ({ users, selectedUsers, onToggleUser, currentTab, page, totalPa
                             }
                         `}
                     >
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleWhitelist(user);
+                            }}
+                            className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-white/10 text-gray-500 hover:text-yellow-400 z-20 transition-colors"
+                            title="Beyaz Listeye Ekle/Çıkar"
+                        >
+                            <Star className={`w-4 h-4 ${currentTab === 'whitelisted' ? 'text-yellow-400 fill-yellow-400' : ''}`} />
+                        </button>
+
                         <div className="flex items-center gap-4">
                             <div className="relative">
                                 <img

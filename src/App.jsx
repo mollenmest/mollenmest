@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
@@ -10,7 +10,8 @@ import {
     unfollowUser,
     getUsersForDisplay,
     UNFOLLOWERS_PER_PAGE,
-    copyListToClipboard
+    copyListToClipboard,
+    WHITELISTED_RESULTS_STORAGE_KEY
 } from './lib/instagram';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,7 +20,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
 
   // App State
-  const [status, setStatus] = useState('initial'); // 'initial', 'scanning', 'unfollowing'
+  const [status, setStatus] = useState('initial'); // 'initial', 'scanning', 'unfollowing', 'idle', 'error'
   const [results, setResults] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [whitelistedResults, setWhitelistedResults] = useState([]);
@@ -29,6 +30,7 @@ function App() {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [scanPaused, setScanPaused] = useState(false);
+  const scanPausedRef = useRef(false); // Ref for async loop access
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -42,6 +44,18 @@ function App() {
     showWithOutProfilePicture: true
   });
 
+  // Load whitelist from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(WHITELISTED_RESULTS_STORAGE_KEY);
+    if (saved) {
+        try {
+            setWhitelistedResults(JSON.parse(saved));
+        } catch (e) {
+            console.error("Failed to parse whitelist", e);
+        }
+    }
+  }, []);
+
   const handleLogin = (user) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
@@ -53,17 +67,28 @@ function App() {
       setStatus('initial');
   };
 
+  const handlePauseToggle = () => {
+      setScanPaused(prev => {
+          const next = !prev;
+          scanPausedRef.current = next;
+          return next;
+      });
+  };
+
   // Logic: Scan
   const startScan = async () => {
     setStatus('scanning');
     setResults([]);
+    setScanPaused(false);
+    scanPausedRef.current = false;
+
     const generator = fetchFollowersGenerator();
 
     try {
         for await (const response of generator) {
-            if (scanPaused) {
-                // Wait loop
-                while (scanPaused) await new Promise(r => setTimeout(r, 500));
+            // Check ref for latest pause state
+            while (scanPausedRef.current) {
+                await new Promise(r => setTimeout(r, 500));
             }
 
             const newUsers = response.data.user.edge_follow.edges.map(e => e.node);
@@ -103,11 +128,31 @@ function App() {
   const paginatedUsers = displayedUsers.slice((page - 1) * UNFOLLOWERS_PER_PAGE, page * UNFOLLOWERS_PER_PAGE);
 
   const toggleUser = (user) => {
+      // Logic from original: Clicking avatar toggles whitelist status
+      // But in this UI, we might want separate actions.
+      // The original code used avatar click for whitelist toggle and checkbox for selection.
+      // Let's implement that pattern.
+
+      // Note: This function handles SELECTION (checkbox equivalent)
       setSelectedUsers(prev => {
           const exists = prev.find(u => u.id === user.id);
           if (exists) return prev.filter(u => u.id !== user.id);
           return [...prev, user];
       });
+  };
+
+  const toggleWhitelist = (user) => {
+      let newWhitelist;
+      const exists = whitelistedResults.find(u => u.id === user.id);
+
+      if (exists) {
+          newWhitelist = whitelistedResults.filter(u => u.id !== user.id);
+      } else {
+          newWhitelist = [...whitelistedResults, user];
+      }
+
+      setWhitelistedResults(newWhitelist);
+      localStorage.setItem(WHITELISTED_RESULTS_STORAGE_KEY, JSON.stringify(newWhitelist));
   };
 
   const toggleAll = () => {
@@ -146,7 +191,7 @@ function App() {
             onUnfollow={startUnfollow}
             status={status}
             onScan={startScan}
-            onPauseScan={() => setScanPaused(!scanPaused)}
+            onPauseScan={handlePauseToggle}
             scanPaused={scanPaused}
             onCopyList={() => copyListToClipboard(displayedUsers)}
             onMenuClick={() => setIsSidebarOpen(true)}
@@ -171,7 +216,8 @@ function App() {
         <Results
             users={paginatedUsers}
             selectedUsers={selectedUsers}
-            onToggleUser={toggleUser}
+            onToggleUser={toggleUser} // For selection
+            onToggleWhitelist={toggleWhitelist} // For whitelist
             currentTab={currentTab}
             page={page}
             totalPages={totalPages}

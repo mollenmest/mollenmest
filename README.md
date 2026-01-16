@@ -1,16 +1,57 @@
-# React + Vite
+# NextGen Unfollowers - Premium Instagram Tool
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Modern, karanlık mod (Dark Mode) destekli ve mobil uyumlu Instagram Takipçi Analiz aracı. Bu proje React, Vite ve Tailwind CSS kullanılarak geliştirilmiştir.
 
-Currently, two official plugins are available:
+**NOT:** Bu proje standalone (tek başına) bir web sitesi olarak çalışırken, Instagram'ın güvenlik politikaları (CORS) nedeniyle gerçek veri çekme işlemleri yerine **demo/simülasyon verileri** kullanır.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Kurulum ve Hostinger'a Yükleme
 
-## React Compiler
+Bu projeyi Hostinger veya benzeri bir sunucuda çalıştırmak için önce "Build" (Derleme) işlemi yapmanız gerekir. İndirdiğiniz dosyaları doğrudan yüklerseniz çalışmaz.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Adım 1: Bilgisayarınızda Hazırlık
 
-## Expanding the ESLint configuration
+1. **Node.js Yükleyin:**
+   Eğer bilgisayarınızda yoksa [Node.js](https://nodejs.org/) adresinden indirin ve kurun.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+2. **Projeyi Açın:**
+   İndirdiğiniz proje klasörünü terminalde veya komut satırında açın.
+
+3. **Gerekli Paketleri Yükleyin:**
+   Aşağıdaki komutu yazıp enter'a basın:
+   ```bash
+   npm install
+   ```
+
+### Adım 2: Build (Derleme) İşlemi
+
+Sitenin yayınlanmaya hazır versiyonunu oluşturmak için şu komutu çalıştırın:
+```bash
+npm run build
+```
+
+Bu işlem tamamlandığında proje klasörünüzde **`dist`** adında yeni bir klasör oluşacaktır.
+
+### Adım 3: Hostinger'a Yükleme
+
+1. Hostinger panelinize girin ve Dosya Yöneticisi'ni (File Manager) açın.
+2. `public_html` klasörüne girin.
+3. Bilgisayarınızdaki **`dist`** klasörünün **içindeki tüm dosyaları** (index.html, assets klasörü vb.) Hostinger'daki `public_html` içine sürükleyip bırakın.
+4. `dist` klasörünün kendisini değil, **içindekileri** yüklediğinizden emin olun.
+
+Artık siteniz çalışacaktır!
+
+## 🛠 Geliştirme (Development)
+
+Projeyi kendi bilgisayarınızda geliştirmek için:
+
+```bash
+npm run dev
+```
+Komutu ile yerel sunucuyu başlatabilirsiniz.
+
+## 📱 Özellikler
+
+- **Premium UI:** Glassmorphism etkileri ve modern animasyonlar.
+- **Responsive:** Telefondan ve bilgisayardan kusursuz erişim.
+- **Filtreleme:** Takip etmeyenler, gizli hesaplar, yumurta kafalar vb. filtreleme.
+- **Toplu İşlem:** Listeyi kopyalama veya toplu seçim yapma.
