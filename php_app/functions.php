@@ -7,10 +7,6 @@ class InstagramAPI {
     private $userId;
     private $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-    // GraphQL Query Hashes
-    const QUERY_HASH_FOLLOWERS = 'c76146de99bb02f6415203be841dd25a';
-    const QUERY_HASH_FOLLOWING = 'd04b0a864b4b54837c0d870b0e77e07f';
-
     public function __construct($sessionId, $csrfToken = null) {
         $this->sessionId = trim($sessionId);
         if ($csrfToken) {
@@ -80,7 +76,6 @@ class InstagramAPI {
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
-        // Correctly handle POST requests even if data is empty
         if ($postData !== null) {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
@@ -93,49 +88,53 @@ class InstagramAPI {
     }
 
     public function getFollowers($limit = 2000) {
-        return $this->fetchGraphList(self::QUERY_HASH_FOLLOWERS, 'edge_followed_by', $limit);
+        return $this->fetchListV1("https://www.instagram.com/api/v1/friendships/{$this->userId}/followers/", $limit);
     }
 
     public function getFollowing($limit = 2000) {
-        return $this->fetchGraphList(self::QUERY_HASH_FOLLOWING, 'edge_follow', $limit);
+        return $this->fetchListV1("https://www.instagram.com/api/v1/friendships/{$this->userId}/following/", $limit);
     }
 
-    private function fetchGraphList($queryHash, $edgeName, $limit) {
+    private function fetchListV1($endpoint, $limit) {
         $users = [];
-        $hasNext = true;
-        $after = null;
+        $nextMaxId = null;
+        $count = 0;
 
-        while ($hasNext && count($users) < $limit) {
-            $variables = json_encode([
-                'id' => $this->userId,
-                'first' => 50,
-                'after' => $after
-            ]);
+        do {
+            $url = $endpoint . '?count=100'; // Request 100 at a time
+            if ($nextMaxId) {
+                $url .= '&max_id=' . urlencode($nextMaxId);
+            }
 
-            $url = "https://www.instagram.com/graphql/query/?query_hash={$queryHash}&variables=" . urlencode($variables);
+            // API V1 endpoints act like AJAX calls
             $response = $this->request($url, true);
             $json = json_decode($response, true);
 
-            if (!isset($json['data']['user'][$edgeName])) {
+            if (!isset($json['users']) || !is_array($json['users'])) {
                 break;
             }
 
-            $edge = $json['data']['user'][$edgeName];
-            foreach ($edge['edges'] as $node) {
-                $u = $node['node'];
+            foreach ($json['users'] as $u) {
+                // Map API V1 fields to our standard structure
+                // V1 uses 'pk' for ID
                 $users[] = [
-                    'id' => $u['id'],
+                    'id' => $u['pk'],
                     'username' => $u['username'],
                     'full_name' => $u['full_name'],
                     'profile_pic_url' => $u['profile_pic_url']
                 ];
+                $count++;
             }
 
-            $hasNext = $edge['page_info']['has_next_page'];
-            $after = $edge['page_info']['end_cursor'];
+            $nextMaxId = isset($json['next_max_id']) ? $json['next_max_id'] : null;
 
+            // Safety break
+            if ($count >= $limit) break;
+
+            // Random delay
             sleep(rand(1, 2));
-        }
+
+        } while ($nextMaxId);
 
         return $users;
     }
